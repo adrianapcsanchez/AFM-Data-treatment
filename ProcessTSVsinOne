@@ -8,7 +8,7 @@ Sub ProcessTSVsInOne()
     Dim newWorkbook As Workbook
     Dim batchFiles As Collection
 
-    ' Selecionar pasta
+    ' Select folder
     With Application.FileDialog(msoFileDialogFolderPicker)
         .Title = "Select Folder with files TSV"
         If .Show <> -1 Then
@@ -18,7 +18,7 @@ Sub ProcessTSVsInOne()
         selectedFolder = .SelectedItems(1)
     End With
 
-    ' Obter lista de arquivos .tsv
+    ' get the files .tsv
     Set fileList = New Collection
     fileName = Dir(selectedFolder & "\*.tsv")
     Do While fileName <> ""
@@ -31,14 +31,14 @@ Sub ProcessTSVsInOne()
         Exit Sub
     End If
 
-    ' Obter o nome final para salvar o arquivo
+    ' Ask for the name of the final file
     finalFileName = Application.GetSaveAsFilename(InitialFileName:="RESUME_", FileFilter:="Arquivos Excel (*.xlsx), *.xlsx")
     If finalFileName = "False" Then
         MsgBox "No name selected. Closing.", vbExclamation
         Exit Sub
     End If
 
-    ' Criar novo workbook e excluir a Sheet1
+    ' Create new workbook and exclude  Sheet1
     Set newWorkbook = Workbooks.Add
     Application.DisplayAlerts = False
     On Error Resume Next
@@ -46,7 +46,7 @@ Sub ProcessTSVsInOne()
     On Error GoTo 0
     Application.DisplayAlerts = True
 
-    ' Processar todos os arquivos de uma vez só
+    ' Process al files
     Set batchFiles = New Collection
     For i = 1 To fileList.Count
         batchFiles.Add fileList(i)
@@ -54,10 +54,10 @@ Sub ProcessTSVsInOne()
 
     Call ProcessBatch(batchFiles, 1, selectedFolder, newWorkbook)
 
-    ' Calcular média e mediana na aba Resume e formatar
+    ' Calculate average and median and them format
     Call CalculateStatistics(newWorkbook.Sheets("Resume"))
 
-    ' Salvar e abrir o workbook final
+    ' Save and open final workbook
     Application.DisplayAlerts = False
     newWorkbook.SaveAs finalFileName
     Workbooks.Open finalFileName
@@ -108,7 +108,7 @@ Sub ProcessBatch(batchFiles As Collection, batchNum As Long, selectedFolder As S
         tempWB.Close SaveChanges:=False
     Next filePath
 
-    ' Criar aba Resume
+    ' Creates sheet Resume
     On Error Resume Next
     Set resumeSheet = wb.Sheets("Resume")
     If resumeSheet Is Nothing Then
@@ -119,7 +119,7 @@ Sub ProcessBatch(batchFiles As Collection, batchNum As Long, selectedFolder As S
 
     colIndex = 1 ' Começa na segunda coluna
 
-    ' Adicionar cabeçalhos
+    ' Add names
     resumeSheet.Cells(1, 1).Value = "Adhesion Force"
     resumeSheet.Cells(2, 1).Value = "Number of cells"
     resumeSheet.Cells(3, 1).Value = "Name of file"
@@ -128,7 +128,7 @@ Sub ProcessBatch(batchFiles As Collection, batchNum As Long, selectedFolder As S
     resumeSheet.Cells(6, 1).Value = "Stdev.P"
     resumeSheet.Rows("1:6").Font.Bold = True
 
-    ' Copiar dados da coluna correta
+    ' Copy data to the right column
     For Each ws In wb.Sheets
         If ws.Name <> "Resume" Then
             adhesionCol = 0
