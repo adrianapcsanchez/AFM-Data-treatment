@@ -1,4 +1,4 @@
-# 🧪 AFM Data Automation Toolkit – Bruker JPK software ~Focus~
+# 🧪 AFM Data treatment Automation – Bruker JPK software Focused
 
 Welcome to the **AFM Data Automation Toolkit**, a collection of scripts, macros, and ideas designed to streamline the data processing workflow of **Atomic Force Microscopy (AFM)** measurements, specifically those generated using **Bruker JPK software**.
 
