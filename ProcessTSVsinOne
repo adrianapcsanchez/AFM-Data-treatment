@@ -1,0 +1,215 @@
+Sub ProcessTSVsInOne()
+    Dim selectedFolder As String
+    Dim fileList As Collection
+    Dim fileName As String
+    Dim filePath As String
+    Dim i As Long
+    Dim finalFileName As String
+    Dim newWorkbook As Workbook
+    Dim batchFiles As Collection
+
+    ' Selecionar pasta
+    With Application.FileDialog(msoFileDialogFolderPicker)
+        .Title = "Select Folder with files TSV"
+        If .Show <> -1 Then
+            MsgBox "No Folder selected. Closing....", vbExclamation
+            Exit Sub
+        End If
+        selectedFolder = .SelectedItems(1)
+    End With
+
+    ' Obter lista de arquivos .tsv
+    Set fileList = New Collection
+    fileName = Dir(selectedFolder & "\*.tsv")
+    Do While fileName <> ""
+        fileList.Add selectedFolder & "\" & fileName
+        fileName = Dir
+    Loop
+
+    If fileList.Count = 0 Then
+        MsgBox "No TSV FILE found.", vbExclamation
+        Exit Sub
+    End If
+
+    ' Obter o nome final para salvar o arquivo
+    finalFileName = Application.GetSaveAsFilename(InitialFileName:="RESUME_", FileFilter:="Arquivos Excel (*.xlsx), *.xlsx")
+    If finalFileName = "False" Then
+        MsgBox "No name selected. Closing.", vbExclamation
+        Exit Sub
+    End If
+
+    ' Criar novo workbook e excluir a Sheet1
+    Set newWorkbook = Workbooks.Add
+    Application.DisplayAlerts = False
+    On Error Resume Next
+    newWorkbook.Sheets("Sheet1").Delete
+    On Error GoTo 0
+    Application.DisplayAlerts = True
+
+    ' Processar todos os arquivos de uma vez só
+    Set batchFiles = New Collection
+    For i = 1 To fileList.Count
+        batchFiles.Add fileList(i)
+    Next i
+
+    Call ProcessBatch(batchFiles, 1, selectedFolder, newWorkbook)
+
+    ' Calcular média e mediana na aba Resume e formatar
+    Call CalculateStatistics(newWorkbook.Sheets("Resume"))
+
+    ' Salvar e abrir o workbook final
+    Application.DisplayAlerts = False
+    newWorkbook.SaveAs finalFileName
+    Workbooks.Open finalFileName
+    Application.DisplayAlerts = True
+
+    MsgBox "Process concluded and file created successfully, thanks to Adriana!", vbInformation
+End Sub
+
+Sub ProcessBatch(batchFiles As Collection, batchNum As Long, selectedFolder As String, wb As Workbook)
+    Dim filePath As Variant
+    Dim tempWB As Workbook
+    Dim tempSheet As Worksheet
+    Dim newSheet As Worksheet
+    Dim resumeSheet As Worksheet
+    Dim colIndex As Long
+    Dim lastRow As Long
+    Dim destRow As Long
+    Dim i As Long
+    Dim counter As Long
+    Dim baseName As String
+    Dim cleanedName As String
+    Dim rawValue As Variant
+    Dim numericValue As Double
+    Dim adhesionCol As Long
+    Dim cellValue As Variant
+    Dim ws As Worksheet
+
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+
+    counter = 1
+    For Each filePath In batchFiles
+        Workbooks.OpenText fileName:=filePath, Origin:=xlWindows, DataType:=xlDelimited, Tab:=True
+        Set tempWB = ActiveWorkbook
+        Set tempSheet = tempWB.Sheets(1)
+
+        baseName = Mid(filePath, InStrRev(filePath, "\") + 1)
+        baseName = Left(baseName, InStrRev(baseName, ".") - 1)
+        cleanedName = CleanSheetName(baseName)
+        Do While SheetExists(wb, cleanedName)
+            cleanedName = cleanedName & "_" & counter
+            counter = counter + 1
+        Loop
+
+        Set newSheet = wb.Sheets.Add(After:=wb.Sheets(wb.Sheets.Count))
+        newSheet.Name = cleanedName
+        tempSheet.UsedRange.Copy Destination:=newSheet.Range("A1")
+        tempWB.Close SaveChanges:=False
+    Next filePath
+
+    ' Criar aba Resume
+    On Error Resume Next
+    Set resumeSheet = wb.Sheets("Resume")
+    If resumeSheet Is Nothing Then
+        Set resumeSheet = wb.Sheets.Add(After:=wb.Sheets(wb.Sheets.Count))
+        resumeSheet.Name = "Resume"
+    End If
+    On Error GoTo 0
+
+    colIndex = 1 ' Começa na segunda coluna
+
+    ' Adicionar cabeçalhos
+    resumeSheet.Cells(1, 1).Value = "Adhesion Force"
+    resumeSheet.Cells(2, 1).Value = "Number of cells"
+    resumeSheet.Cells(3, 1).Value = "Name of file"
+    resumeSheet.Cells(4, 1).Value = "Average"
+    resumeSheet.Cells(5, 1).Value = "Median"
+    resumeSheet.Cells(6, 1).Value = "Stdev.P"
+    resumeSheet.Rows("1:6").Font.Bold = True
+
+    ' Copiar dados da coluna correta
+    For Each ws In wb.Sheets
+        If ws.Name <> "Resume" Then
+            adhesionCol = 0
+            For i = 1 To ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+                cellValue = Trim(ws.Cells(1, i).Value)
+                If InStr(1, cellValue, "Adhesion", vbTextCompare) > 0 And InStr(1, cellValue, "[N]", vbTextCompare) > 0 Then
+                    adhesionCol = i
+                    Exit For
+                End If
+            Next i
+
+            If adhesionCol > 0 Then
+                lastRow = ws.Cells(ws.Rows.Count, adhesionCol).End(xlUp).Row
+
+                resumeSheet.Cells(1, colIndex + 1).Value = "Adhesion (pN)"
+                resumeSheet.Cells(2, colIndex + 1).Value = colIndex - 0
+                resumeSheet.Cells(3, colIndex + 1).Value = ws.Name
+
+                destRow = 7
+                For i = 2 To lastRow
+                    rawValue = ws.Cells(i, adhesionCol).Value
+                    If IsNumeric(rawValue) Then
+                        numericValue = CDbl(rawValue) * 10 ^ 12
+                        resumeSheet.Cells(destRow, colIndex + 1).Value = numericValue
+                        resumeSheet.Cells(destRow, colIndex + 1).NumberFormat = "0.00"
+                        destRow = destRow + 1
+                    End If
+                Next i
+
+                colIndex = colIndex + 1
+            End If
+        End If
+    Next ws
+
+    Application.ScreenUpdating = True
+    Application.Calculation = xlCalculationAutomatic
+End Sub
+
+Sub CalculateStatistics(resumeSheet As Worksheet)
+    Dim lastColumn As Long
+    Dim i As Long
+    Dim dataRange As Range
+    Dim lastDataRow As Long
+
+    Application.Calculation = xlCalculationAutomatic
+
+    lastColumn = resumeSheet.Cells(1, Columns.Count).End(xlToLeft).Column
+
+    For i = 2 To lastColumn
+        lastDataRow = resumeSheet.Cells(Rows.Count, i).End(xlUp).Row
+        If lastDataRow > 6 Then
+            Set dataRange = resumeSheet.Range(resumeSheet.Cells(7, i), resumeSheet.Cells(lastDataRow, i))
+           resumeSheet.Cells(4, i).Formula = "=AVERAGE(" & dataRange.Address(False, False) & ")"
+            resumeSheet.Cells(5, i).Formula = "=MEDIAN(" & dataRange.Address(False, False) & ")"
+            resumeSheet.Cells(6, i).Formula = "=STDEV.P(" & dataRange.Address(False, False) & ")"
+            resumeSheet.Cells(4, i).NumberFormat = "0.00"
+            resumeSheet.Cells(5, i).NumberFormat = "0.00"
+            resumeSheet.Cells(6, i).NumberFormat = "0.00"
+        Else
+            resumeSheet.Cells(4, i).Value = ""
+            resumeSheet.Cells(5, i).Value = ""
+             resumeSheet.Cells(6, i).Value = ""
+        End If
+    Next i
+End Sub
+
+Function SheetExists(wb As Workbook, sheetName As String) As Boolean
+    On Error Resume Next
+    SheetExists = Not wb.Sheets(sheetName) Is Nothing
+    On Error GoTo 0
+End Function
+
+Function CleanSheetName(sheetName As String) As String
+    Dim invalidChars As Variant
+    Dim char As Variant
+    invalidChars = Array("/", "\", "[", "]", "*", "?", ":", "'", Chr(0))
+    For Each char In invalidChars
+        sheetName = Replace(sheetName, char, "_")
+    Next char
+    If Len(sheetName) > 31 Then
+        sheetName = Left(sheetName, 31)
+    End If
+    CleanSheetName = sheetName
+End Function
