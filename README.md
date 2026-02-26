@@ -26,7 +26,7 @@ This repository helps you:
 - Computes **average, median, and stdev.p**.
 - Writes a central `Resume` sheet.
 
-### 3) Python script: `YMRepresentativeCurves.py`
+### 3) Python script: `YMProfiles.py`
 - Recursively finds `.txt/.TXT` force-curve files.
 - Cleans and parses force-curve points.
 - Uses interpolation + PCA + KMeans to select **4 representative curves**.
@@ -36,7 +36,6 @@ This repository helps you:
 ## ⚠️ Important JPK export instruction (required before using the Python script)
 
 For this code to work with your Young Modulus curves, use **Batch Processing** in JPK and:
-
 1. Select **Save Force Curves**.
 2. Check the option **Save in TXT**.
 3. Start the YM curve analysis.
