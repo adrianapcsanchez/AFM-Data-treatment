@@ -32,7 +32,8 @@ This repository is intended as a practical and evolving toolkit to:
 -📈 Compiles all results into a centralized Resume sheet
 -💾 Prompts user to save the final compiled .xlsx file
 
-### 3) Python script: `YMRepresentativeCurves.py`
+### 3) Python script: `YMcells.py`
+From all graphs, the code will select 4 representative curves, from 4 clusters 
 - Recursively finds `.txt/.TXT` force-curve files.
 - Cleans and parses force-curve points.
 - Uses interpolation + PCA + KMeans to select **4 representative curves**.
